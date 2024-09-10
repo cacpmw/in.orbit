@@ -40,13 +40,18 @@ export async function createGoalCompletion({
     })
     .from(goals)
     .leftJoin(goalCompletionsCount, eq(goalCompletions.goalId, goals.id))
-    .where(eq(goals.id, goalId));
+    .where(eq(goals.id, goalId))
+    .limit(1);
+  const { desiredWeeklyFrequency, completionCount } = result[0];
 
-  // const result = await db
-  //   .insert(goalCompletions)
-  //   .values({ goalId })
-  //   .returning();
+  if (completionCount >= desiredWeeklyFrequency) {
+    throw new Error("Goal already completed this week!");
+  }
+  const insertResult = await db
+    .insert(goalCompletions)
+    .values({ goalId })
+    .returning();
 
-  // const goalCompletion = result[0];
-  return result;
+  const goalCompletion = insertResult[0];
+  return { goalCompletion };
 }
