@@ -13,6 +13,8 @@ export async function createGoalCompletion({
   const firstDayOfWeek = dayjs().startOf("week").toDate();
   const lastDayOfWeek = dayjs().endOf("week").toDate();
 
+  //CTE - filter records within the date range, count the completion of
+  // goals and group them by id
   const goalCompletionsCount = db.$with("goal_completions_count").as(
     db
       .select({
@@ -30,6 +32,7 @@ export async function createGoalCompletion({
       .groupBy(goalCompletions.goalId)
   );
 
+  // LEFT JOIN the above CTE to the goals table
   const result = await db
     .with(goalCompletionsCount)
     .select({
@@ -39,9 +42,10 @@ export async function createGoalCompletion({
     `.mapWith(Number),
     })
     .from(goals)
-    .leftJoin(goalCompletionsCount, eq(goalCompletions.goalId, goals.id))
+    .leftJoin(goalCompletionsCount, eq(goalCompletionsCount.goalId, goals.id))
     .where(eq(goals.id, goalId))
     .limit(1);
+
   const { desiredWeeklyFrequency, completionCount } = result[0];
 
   if (completionCount >= desiredWeeklyFrequency) {
@@ -55,3 +59,32 @@ export async function createGoalCompletion({
   const goalCompletion = insertResult[0];
   return { goalCompletion };
 }
+
+/**
+ * WITH
+  "goal_completions_count" AS (
+    SELECT
+      "goal_id",
+      COUNT("id") AS "completionCount"
+    FROM
+      "goals_completions"
+    WHERE
+      (
+        "goals_completions"."created_at" >= '2024-09-08T03:00:00.000Z'
+        AND "goals_completions"."created_at" <= '2024-09-15T02:59:59.999Z'
+        AND "goals_completions"."goal_id" = 'b9jpc4bi0hjn8i55orwptt9z'
+      )
+    GROUP BY
+      "goals_completions"."goal_id"
+  )
+SELECT
+  "goals"."desired_weekly_frequency",
+  COALESCE("completionCount", 0) as "completionCount"
+FROM
+  "goals"
+  LEFT JOIN "goal_completions_count" ON "goal_completions_count"."goal_id" = "goals"."id"
+WHERE
+  "goals"."id" = 'b9jpc4bi0hjn8i55orwptt9z'
+LIMIT
+  1
+ */
